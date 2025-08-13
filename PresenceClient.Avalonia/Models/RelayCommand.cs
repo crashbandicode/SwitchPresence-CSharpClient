@@ -22,4 +22,19 @@ namespace PresenceClient.Avalonia.Models
 
         public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
+    
+    // A simple command implementation for the tray icon menu items.
+    public class ActionCommand : ICommand
+    {
+        private readonly Action _action;
+        public event EventHandler? CanExecuteChanged;
+
+        public ActionCommand(Action action)
+        {
+            _action = action;
+        }
+
+        public bool CanExecute(object? parameter) => true;
+        public void Execute(object? parameter) => _action();
+    }
 }

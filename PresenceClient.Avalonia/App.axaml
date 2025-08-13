@@ -12,4 +12,16 @@
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>
+             <TrayIcon.Icons>
+                 <TrayIcons>
+                     <TrayIcon IsVisible="False" Icon="/Assets/avalonia-logo.ico" ToolTipText="Switch Presence Client">
+                         <TrayIcon.Menu>
+                             <NativeMenu>
+                                 <NativeMenuItem Header="Show"/>
+                                 <NativeMenuItem Header="Exit"/>
+                             </NativeMenu>
+                         </TrayIcon.Menu>
+                     </TrayIcon>
+                 </TrayIcons>
+             </TrayIcon.Icons>
 </Application>

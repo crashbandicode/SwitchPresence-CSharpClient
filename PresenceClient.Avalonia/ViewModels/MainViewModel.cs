@@ -1,17 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Net.Http;
+using System.IO;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using DiscordRPC;
 using MsBox.Avalonia;
-using Newtonsoft.Json;
+using System.Text.Json;
 using PresenceClient.Avalonia.Models;
 
 namespace PresenceClient.Avalonia.ViewModels
@@ -23,15 +19,14 @@ namespace PresenceClient.Avalonia.ViewModels
         private string _clientId = "";
         private bool _ignoreHomeScreen;
         private bool _isVerbose = true;
+        private bool _minimizeToTray;
         private string _logOutput = "";
         private bool _isRunning;
         private CancellationTokenSource? _cancellationTokenSource;
         private Task? _clientTask;
-        private static readonly HttpClient httpClient = new();
-
-        private const int TcpPort = 0xCAFE; // 51966
-        private const uint PacketMagicQuest = 0xFFAADD23;
         
+        private const int TcpPort = 0xCAFE; // 51966
+
         // --- Presence Info Fields ---
         private string _currentTitleName = "";
         private string _currentDetails = "";
@@ -41,36 +36,12 @@ namespace PresenceClient.Avalonia.ViewModels
 
 
         // --- Public Properties (for data binding) ---
-        public string IpAddress
-        {
-            get => _ipAddress;
-            set => SetProperty(ref _ipAddress, value);
-        }
-
-        public string ClientId
-        {
-            get => _clientId;
-            set => SetProperty(ref _clientId, value);
-        }
-
-        public bool IgnoreHomeScreen
-        {
-            get => _ignoreHomeScreen;
-            set => SetProperty(ref _ignoreHomeScreen, value);
-        }
-
-        public bool IsVerbose
-        {
-            get => _isVerbose;
-            set => SetProperty(ref _isVerbose, value);
-        }
-
-        public string LogOutput
-        {
-            get => _logOutput;
-            set => SetProperty(ref _logOutput, value);
-        }
-
+        public string IpAddress { get => _ipAddress; set => SetProperty(ref _ipAddress, value); }
+        public string ClientId { get => _clientId; set => SetProperty(ref _clientId, value); }
+        public bool IgnoreHomeScreen { get => _ignoreHomeScreen; set => SetProperty(ref _ignoreHomeScreen, value); }
+        public bool IsVerbose { get => _isVerbose; set => SetProperty(ref _isVerbose, value); }
+        public bool MinimizeToTray { get => _minimizeToTray; set => SetProperty(ref _minimizeToTray, value); }
+        public string LogOutput { get => _logOutput; set => SetProperty(ref _logOutput, value); }
         public bool IsRunning
         {
             get => _isRunning;
@@ -79,13 +50,11 @@ namespace PresenceClient.Avalonia.ViewModels
                 if (SetProperty(ref _isRunning, value))
                 {
                     OnPropertyChanged(nameof(IsNotRunning));
-                    // Notify the commands that their CanExecute status may have changed.
                     StartCommand.RaiseCanExecuteChanged();
                     StopCommand.RaiseCanExecuteChanged();
                 }
             }
         }
-
         public bool IsNotRunning => !IsRunning;
         
         // --- Public Presence Info Properties ---
@@ -99,12 +68,16 @@ namespace PresenceClient.Avalonia.ViewModels
         // --- Commands ---
         public RelayCommand StartCommand { get; }
         public RelayCommand StopCommand { get; }
+        public RelayCommand SaveSettingsCommand { get; }
 
         public MainViewModel()
         {
             StartCommand = new RelayCommand(async () => await StartClient(), () => !IsRunning);
             StopCommand = new RelayCommand(StopClient, () => IsRunning);
-            ClearPresenceInfo(); // Initialize fields on startup
+            SaveSettingsCommand = new RelayCommand(async () => await SaveSettings());
+            
+            LoadSettings();
+            ClearPresenceInfo();
         }
         
         private void ClearPresenceInfo()
@@ -118,7 +91,13 @@ namespace PresenceClient.Avalonia.ViewModels
         
         private async Task ShowErrorDialog(string message)
         {
-            var box = MessageBoxManager.GetMessageBoxStandard("Input Error", message);
+            var box = MessageBoxManager.GetMessageBoxStandard("Error", message);
+            await box.ShowAsync();
+        }
+        
+        private async Task ShowSuccessDialog(string message)
+        {
+            var box = MessageBoxManager.GetMessageBoxStandard("Success", message);
             await box.ShowAsync();
         }
 
@@ -135,13 +114,13 @@ namespace PresenceClient.Avalonia.ViewModels
             _clientTask = Task.Run(() => MainLoop(token), token);
         }
 
-        private void StopClient()
+        public void StopClient()
         {
             if (!IsRunning || _cancellationTokenSource == null) return;
 
             Log("Stopping client...");
             _cancellationTokenSource.Cancel();
-            _clientTask?.Wait(2000);
+            // Removed synchronous Wait to avoid blocking UI thread during shutdown
             IsRunning = false;
             ClearPresenceInfo();
             Log("Client stopped.");
@@ -180,14 +159,13 @@ namespace PresenceClient.Avalonia.ViewModels
 
                         var title = new TitlePacket(buffer);
                         
-                        // The name from the packet is the most reliable way to check for changes.
                         if (title.Name == lastProgramName)
                         {
                             await Task.Delay(1000, token);
                             continue;
                         }
 
-                        Log($"Received Title: {title.Name} (PID: {title.PID}, Magic: 0x{title.Magic:X})");
+                        Log($"Received Title: {title.Name} (PID: {title.PID:X16})");
                         startTimer = DateTime.UtcNow;
                         lastProgramName = title.Name;
 
@@ -221,9 +199,10 @@ namespace PresenceClient.Avalonia.ViewModels
 
         private void UpdatePresence(DiscordRpcClient rpc, TitlePacket title, DateTime startTime)
         {
-            string details = "";
-            string largeImageKey = "";
+            string details;
+            string largeImageKey;
             string largeImageText = title.Name;
+            string smallImageKey = "";
             string smallImageText = "";
 
             if (title.Name == "Home Menu")
@@ -232,15 +211,16 @@ namespace PresenceClient.Avalonia.ViewModels
                 details = "Navigating the Home Menu";
                 largeImageText = "Home Menu";
                 smallImageText = "On the Switch";
+                smallImageKey = "switch"; // Assuming you want a small image here too; adjust if not
             }
             else
             {
-                smallImageText = "SwitchPresence-Rewritten";
+                smallImageText = "Nintendo Switch";
                 largeImageKey = $"0{title.PID:x}";
                 details = title.Name;
+                smallImageKey = "switch"; // Add this to enable the small image tooltip
             }
             
-            // Defensively truncate strings to ensure they fit Discord's API limits.
             if (details.Length > 128) details = details.Substring(0, 128);
             if (largeImageText.Length > 128) largeImageText = largeImageText.Substring(0, 128);
             if (smallImageText.Length > 128) smallImageText = smallImageText.Substring(0, 128);
@@ -249,13 +229,18 @@ namespace PresenceClient.Avalonia.ViewModels
             var presence = new RichPresence()
             {
                 Details = details,
-                Assets = new Assets() { LargeImageKey = largeImageKey, LargeImageText = largeImageText, SmallImageText = smallImageText },
+                Assets = new Assets() 
+                { 
+                    LargeImageKey = largeImageKey, 
+                    LargeImageText = largeImageText, 
+                    SmallImageKey = smallImageKey, 
+                    SmallImageText = smallImageText 
+                },
                 Timestamps = new Timestamps(startTime)
             };
             
             rpc.SetPresence(presence);
             
-            // Update the UI properties. Use the final, potentially overridden, name for the display.
             CurrentTitleName = largeImageText;
             CurrentDetails = details;
             CurrentLargeImageKey = largeImageKey;
@@ -263,6 +248,72 @@ namespace PresenceClient.Avalonia.ViewModels
             CurrentSmallImageText = smallImageText;
             
             Log($"Updated presence: {details}");
+        }
+        
+        private async Task SaveSettings()
+        {
+            try
+            {
+                var settings = new AppSettings
+                {
+                    IpAddress = this.IpAddress,
+                    ClientId = this.ClientId,
+                    IgnoreHomeScreen = this.IgnoreHomeScreen,
+                    IsVerbose = this.IsVerbose,
+                    MinimizeToTray = this.MinimizeToTray
+                };
+
+                string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                string settingsDir = Path.Combine(appDataPath, "SwitchPresenceClient");
+                Directory.CreateDirectory(settingsDir); // Ensure the directory exists
+                string settingsFile = Path.Combine(settingsDir, "settings.json");
+
+                var serializeOptions = new JsonSerializerOptions { WriteIndented = true };
+                string json = JsonSerializer.Serialize(settings, serializeOptions);
+                File.WriteAllText(settingsFile, json);
+                
+                Log("Settings saved successfully.");
+                await ShowSuccessDialog("Settings saved successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log($"Error saving settings: {ex.Message}");
+                await ShowErrorDialog($"Error saving settings: {ex.Message}");
+            }
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                string settingsFile = Path.Combine(appDataPath, "SwitchPresenceClient", "settings.json");
+
+                if (File.Exists(settingsFile))
+                {
+                    string json = File.ReadAllText(settingsFile);
+                    var deserializeOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var settings = JsonSerializer.Deserialize<AppSettings>(json, deserializeOptions);
+
+                    if (settings != null)
+                    {
+                        IpAddress = settings.IpAddress;
+                        ClientId = settings.ClientId;
+                        IgnoreHomeScreen = settings.IgnoreHomeScreen;
+                        IsVerbose = settings.IsVerbose;
+                        MinimizeToTray = settings.MinimizeToTray;
+                        Log("Settings loaded successfully.");
+                    }
+                }
+                else
+                {
+                    Log("No settings file found. Using default values.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Error loading settings: {ex.Message}");
+            }
         }
 
         private async Task<bool> ValidateInput()
@@ -284,7 +335,6 @@ namespace PresenceClient.Avalonia.ViewModels
 
         private void Log(string message)
         {
-            // Use Avalonia's Dispatcher to post UI updates from background threads.
             Dispatcher.UIThread.Post(() =>
             {
                 if (IsVerbose)

@@ -33,12 +33,10 @@ namespace PresenceClient.Avalonia.Models
                 Magic = rawPacket.Magic;
                 PID = rawPacket.PID;
                 
-                // Find the first null terminator in the byte array to prevent reading garbage data.
                 int nullTerminatorIndex = Array.IndexOf(rawPacket.NameBytes, (byte)0);
                 int length = nullTerminatorIndex >= 0 ? nullTerminatorIndex : rawPacket.NameBytes.Length;
-
-                // Decode only the valid part of the string.
-                string decodedName = Encoding.UTF8.GetString(rawPacket.NameBytes, 0, length);
+                
+                string decodedName = Encoding.UTF8.GetString(rawPacket.NameBytes, 0, length).Trim();
 
                 Name = PID == 0 ? "Home Menu" : decodedName;
             }

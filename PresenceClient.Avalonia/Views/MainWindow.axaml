@@ -7,12 +7,10 @@
         x:Class="PresenceClient.Avalonia.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="Discord Presence Client (Avalonia)"
+        Title="Switch Presence Client"
         Width="800" Height="650" MinWidth="600" MinHeight="550">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE, -->
-        <!-- to switch between Populated and Unpopulated states. -->
         <vm:MainViewModel/>
     </Design.DataContext>
 
@@ -29,13 +27,15 @@
         <!-- Row 2: Options -->
         <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="5">
             <CheckBox Content="Ignore Home Screen" IsChecked="{Binding IgnoreHomeScreen}" VerticalAlignment="Center" Margin="0,0,20,0" IsEnabled="{Binding IsNotRunning}"/>
-            <CheckBox Content="Verbose Mode" IsChecked="{Binding IsVerbose}" VerticalAlignment="Center"/>
+            <CheckBox Content="Verbose Mode" IsChecked="{Binding IsVerbose}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+            <CheckBox Content="Minimize to Tray on Close" IsChecked="{Binding MinimizeToTray}" VerticalAlignment="Center" />
         </StackPanel>
 
         <!-- Row 3: Buttons -->
         <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="5">
             <Button Content="Start" Command="{Binding StartCommand}" Width="100" Margin="0,0,10,0"/>
-            <Button Content="Stop" Command="{Binding StopCommand}" Width="100"/>
+            <Button Content="Stop" Command="{Binding StopCommand}" Width="100" Margin="0,0,10,0"/>
+            <Button Content="Save Settings" Command="{Binding SaveSettingsCommand}" Width="120"/>
         </StackPanel>
         
         <!-- Row 4: Current Status Display -->
