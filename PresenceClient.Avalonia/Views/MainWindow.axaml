@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PresenceClient.Avalonia.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+        x:Class="PresenceClient.Avalonia.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Discord Presence Client (Avalonia)"
+        Width="800" Height="650" MinWidth="600" MinHeight="550">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE, -->
+        <!-- to switch between Populated and Unpopulated states. -->
+        <vm:MainViewModel/>
+    </Design.DataContext>
+
+    <Grid Margin="15" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnDefinitions="Auto,*">
+
+        <!-- Row 0: IP Address -->
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Device IP Address:" VerticalAlignment="Center" Margin="5"/>
+        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding IpAddress}" VerticalAlignment="Center" Margin="5" IsEnabled="{Binding IsNotRunning}"/>
+
+        <!-- Row 1: Client ID -->
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Discord Client ID:" VerticalAlignment="Center" Margin="5"/>
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ClientId}" VerticalAlignment="Center" Margin="5" IsEnabled="{Binding IsNotRunning}"/>
+
+        <!-- Row 2: Options -->
+        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="5">
+            <CheckBox Content="Ignore Home Screen" IsChecked="{Binding IgnoreHomeScreen}" VerticalAlignment="Center" Margin="0,0,20,0" IsEnabled="{Binding IsNotRunning}"/>
+            <CheckBox Content="Verbose Mode" IsChecked="{Binding IsVerbose}" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Row 3: Buttons -->
+        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="5">
+            <Button Content="Start" Command="{Binding StartCommand}" Width="100" Margin="0,0,10,0"/>
+            <Button Content="Stop" Command="{Binding StopCommand}" Width="100"/>
+        </StackPanel>
+        
+        <!-- Row 4: Current Status Display -->
+        <Border Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" BorderBrush="Gray" BorderThickness="1" CornerRadius="4" Padding="10" Margin="5">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*" >
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Title Name:" FontWeight="Bold" Margin="0,0,10,5" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CurrentTitleName}" IsReadOnly="True" Margin="0,0,0,5"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Details:" FontWeight="Bold" Margin="0,0,10,5" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CurrentDetails}" IsReadOnly="True" Margin="0,0,0,5"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Large Image Key:" FontWeight="Bold" Margin="0,0,10,5" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CurrentLargeImageKey}" IsReadOnly="True" Margin="0,0,0,5"/>
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Large Image Text:" FontWeight="Bold" Margin="0,0,10,5" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CurrentLargeImageText}" IsReadOnly="True" Margin="0,0,0,5"/>
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Small Image Text:" FontWeight="Bold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding CurrentSmallImageText}" IsReadOnly="True" Margin="0,0,0,0"/>
+            </Grid>
+        </Border>
+
+        <!-- Row 5: Log Viewer -->
+        <ScrollViewer Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Margin="5" IsVisible="{Binding IsVerbose}">
+            <TextBox Text="{Binding LogOutput}" IsReadOnly="true" TextWrapping="Wrap" AcceptsReturn="True" FontFamily="monospace"/>
+        </ScrollViewer>
+    </Grid>
+</Window>
